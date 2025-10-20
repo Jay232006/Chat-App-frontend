@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a modern chat application frontend built with React and Vite. The project uses React 19 for the UI framework and Tailwind CSS 4 for styling. It features a clean, aesthetic design with a conversation list sidebar, message viewing area, and message input functionality. The UI is designed to be simple and not overly complex, ready to integrate with a backend API.
+This is a modern chat application frontend built with React and Vite. The project uses React 19 for the UI framework, Tailwind CSS 4 for styling, and React Router for multi-page navigation. It features a clean, aesthetic design with multiple pages including login, chat interface, user profile, and settings. The UI is designed to be simple and not overly complex, ready to integrate with a backend API.
 
 **Last Updated**: October 20, 2025
 
@@ -41,8 +41,15 @@ Preferred communication style: Simple, everyday language.
 - `src/main.jsx`: JavaScript entry point that mounts the React application
 - `src/index.css`: Global styles with Tailwind imports using `@import "tailwindcss"` syntax for Tailwind v4
 
+**Pages Structure**
+- `src/pages/Login.jsx`: Login page with email/password authentication form
+- `src/pages/ChatPage.jsx`: Main chat interface combining ChatList and ChatWindow components
+- `src/pages/Profile.jsx`: User profile page with editable user information
+- `src/pages/Settings.jsx`: Settings page for notifications, appearance, privacy, and account management
+
 **Component Structure**
-- `src/App.jsx`: Main application component managing state for selected chat
+- `src/App.jsx`: Main application component with React Router configuration and route definitions
+- `src/components/Navbar.jsx`: Navigation bar with links to Messages, Profile, Settings, and Logout
 - `src/components/ChatList.jsx`: Left sidebar component displaying list of conversations with search functionality, online status indicators, and unread message badges
 - `src/components/ChatWindow.jsx`: Main chat area displaying messages and handling conversation view
 - `src/components/MessageInput.jsx`: Input component at bottom of chat window for composing and sending messages
@@ -53,6 +60,12 @@ Preferred communication style: Simple, everyday language.
 - PostCSS: Configured with `@tailwindcss/postcss` plugin for Tailwind CSS v4 compatibility
 
 ### Design Patterns
+
+**Routing Architecture**
+- React Router (BrowserRouter) for client-side routing
+- Route definitions in `src/App.jsx` with paths: `/` (Login), `/chat`, `/profile`, `/settings`
+- Protected navigation with Navbar component on authenticated pages
+- Wildcard route redirect to login for undefined paths
 
 **Module System**
 - Native ES Modules throughout the project
@@ -71,6 +84,7 @@ Preferred communication style: Simple, everyday language.
 **React Ecosystem**
 - `react` (19.2.0): Core React library
 - `react-dom` (19.2.0): React DOM rendering
+- `react-router-dom` (^7.5.2): Declarative routing for React single-page applications
 
 **Build Tools**
 - `vite` (7.1.11): Development server and build tool
