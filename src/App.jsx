@@ -1,21 +1,21 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import Login from './pages/Login'
-import ChatPage from './pages/ChatPage'
-import Profile from './pages/Profile'
-import Settings from './pages/Settings'
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Signup from './pages/Signup';
+import Login from './pages/Login';
+import ChatPage from './pages/ChatPage';
+// Assuming you have these other pages as described in replit.md
+// import Profile from './pages/Profile';
+// import Settings from './pages/Settings';
 
 function App() {
   return (
-    <Router>
+    <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/chat" element={<ChatPage />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Router>
-  )
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
