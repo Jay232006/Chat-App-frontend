@@ -1,19 +1,46 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react';
 
 const ChatList = ({ selectedChat, onSelectChat }) => {
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState('');
+  const [chats, setChats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const mockChats = [
-    { id: 1, name: 'John Doe', lastMessage: 'Hey, how are you?', time: '2:30 PM', unread: 2, online: true },
-    { id: 2, name: 'Jane Smith', lastMessage: 'See you tomorrow!', time: '1:15 PM', unread: 0, online: true },
-    { id: 3, name: 'Mike Johnson', lastMessage: 'Thanks for the help', time: '12:45 PM', unread: 1, online: false },
-    { id: 4, name: 'Sarah Williams', lastMessage: 'That sounds great', time: 'Yesterday', unread: 0, online: false },
-    { id: 5, name: 'Team Chat', lastMessage: 'Meeting at 3 PM', time: 'Yesterday', unread: 5, online: false },
-  ]
+  useEffect(() => {
+    const ctrl = new AbortController();
+    async function loadUsers() {
+      try {
+        setLoading(true);
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const res = await fetch(`${base}/api/users`, { signal: ctrl.signal });
+        if (!res.ok) throw new Error('Failed to load users');
+        const users = await res.json();
+        // map server users to UI shape
+        const items = users.map(u => ({
+          id: u._id,
+          name: u.username,
+          lastMessage: '',
+          time: '',
+          unread: 0,
+          online: false
+        }));
+        setChats(items);
+      } catch (err) {
+        if (err.name !== 'AbortError') setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadUsers();
+    return () => ctrl.abort();
+  }, []);
 
-  const filteredChats = mockChats.filter(chat =>
+  const filteredChats = chats.filter(chat =>
     chat.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  );
+
+  if (loading) return <div className="w-80 p-4">Loading...</div>;
+  if (error) return <div className="w-80 p-4 text-red-500">Error: {error}</div>;
 
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
@@ -27,9 +54,6 @@ const ChatList = ({ selectedChat, onSelectChat }) => {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full px-4 py-2 bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <svg className="absolute right-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
         </div>
       </div>
 
@@ -45,11 +69,8 @@ const ChatList = ({ selectedChat, onSelectChat }) => {
             <div className="flex items-center gap-3">
               <div className="relative">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
-                  {chat.name.charAt(0)}
+                  {chat.name?.charAt(0) ?? '?'}
                 </div>
-                {chat.online && (
-                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
@@ -70,7 +91,7 @@ const ChatList = ({ selectedChat, onSelectChat }) => {
         ))}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ChatList
+export default ChatList;
