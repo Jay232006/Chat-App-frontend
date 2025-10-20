@@ -2,9 +2,8 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Signup from './pages/Signup';
 import Login from './pages/Login';
 import ChatPage from './pages/ChatPage';
-// Assuming you have these other pages as described in replit.md
-// import Profile from './pages/Profile';
-// import Settings from './pages/Settings';
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -13,6 +12,8 @@ function App() {
         <Route path="/" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>
   );

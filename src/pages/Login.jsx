@@ -5,14 +5,28 @@ import API from "../utils/api";
 const Login = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // TODO: Connect to your backend API for authentication
-    // For now, just navigate to chat
-    navigate('/chat')
-  }
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await API.post('/auth/login', { email, password });
+      // Store token and user info for authenticated requests
+      localStorage.setItem('userToken', response.data.token);
+      localStorage.setItem('userInfo', JSON.stringify(response.data.user));
+      console.log('Login successful:', response.data);
+      navigate('/chat');
+    } catch (err) {
+      setError(err.response?.data?.message || 'An error occurred during login.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -26,6 +40,13 @@ const Login = () => {
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h1>
           <p className="text-gray-600">Sign in to continue to your chats</p>
         </div>
+
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6" role="alert">
+            <strong className="font-bold">Oops! </strong>
+            <span className="block sm:inline">{error}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -68,9 +89,10 @@ const Login = () => {
 
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sign In
+            {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
 
