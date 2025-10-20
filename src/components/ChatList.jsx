@@ -13,7 +13,7 @@ const ChatList = ({ selectedChat, onSelectChat }) => {
     async function loadUsers() {
       try {
         setLoading(true);
-        const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const res = await fetch(`${base}/api/users`, { signal: ctrl.signal });
         if (!res.ok) throw new Error('Failed to load users');
         const users = await res.json();

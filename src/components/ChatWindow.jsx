@@ -9,13 +9,14 @@ const ChatWindow = ({ selectedChat }) => {
   const { darkMode } = useTheme()
   const socket = useRef()
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
   const [currentChatId, setCurrentChatId] = useState(null)
   const [currentChat, setCurrentChat] = useState(null)
   const currentChatIdRef = useRef(null)
   
   // Initialize socket connection
   useEffect(() => {
-    socket.current = io('http://localhost:5000')
+    socket.current = io(API_BASE)
     
     // Setup user connection
     if (userInfo && userInfo._id) {
@@ -46,8 +47,7 @@ const ChatWindow = ({ selectedChat }) => {
   // Resolve or create chat for selected contact
   useEffect(() => {
     if (!selectedChat?.id) return
-    const base = 'http://localhost:5000'
-    fetch(`${base}/api/chats`, {
+    fetch(`${API_BASE}/api/chats`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -78,7 +78,7 @@ const ChatWindow = ({ selectedChat }) => {
     // Join this chat room
     socket.current.emit('join chat', currentChatId)
     // Fetch messages for this chat
-    fetch(`http://localhost:5000/api/messages/${currentChatId}`, {
+    fetch(`${API_BASE}/api/messages/${currentChatId}`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
@@ -111,25 +111,49 @@ const ChatWindow = ({ selectedChat }) => {
     currentChatIdRef.current = currentChatId
   }, [currentChatId])
 
-  const handleSendMessage = (text) => {
-    if (!text.trim() || !currentChatId) return
-    
+  const handleSendMessage = async (text) => {
+    if (!text.trim()) return
+
+    let chatId = currentChatId
+    // Resolve chatId on-demand if missing
+    if (!chatId && selectedChat?.id) {
+      try {
+        const res = await fetch(`${API_BASE}/api/chats`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ userId: selectedChat.id })
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const chat = await res.json()
+        setCurrentChat(chat)
+        setCurrentChatId(chat._id)
+        chatId = chat._id
+      } catch (err) {
+        console.error('Failed to resolve chat before sending:', err)
+        return
+      }
+    }
+
     const currentTime = new Date()
     const timeString = currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     const tempId = `temp-${Date.now()}`
     const newMessage = { id: tempId, text, sender: 'me', time: timeString }
     setMessages(prev => [...prev, newMessage])
-    // Send message to server
-    fetch('http://localhost:5000/api/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({ content: text, chatId: currentChatId })
-    })
-    .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json() })
-    .then(data => {
+
+    try {
+      const res = await fetch(`${API_BASE}/api/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ content: text, chatId })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
       setMessages(prev => prev.map(msg => msg.id === tempId ? {
         id: data._id || data.id,
         text: data.content,
@@ -137,11 +161,10 @@ const ChatWindow = ({ selectedChat }) => {
         time: new Date(data.createdAt || currentTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
       } : msg))
       socket.current.emit('new message', data)
-    })
-    .catch(err => {
+    } catch (err) {
       console.error('Error sending message:', err)
       setMessages(prev => prev.map(msg => msg.id === tempId ? { ...msg, failed: true } : msg))
-    })
+    }
   }
 
   if (!selectedChat) {
