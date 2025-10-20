@@ -9,6 +9,9 @@ const ChatWindow = ({ selectedChat }) => {
   const { darkMode } = useTheme()
   const socket = useRef()
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  const [currentChatId, setCurrentChatId] = useState(null)
+  const [currentChat, setCurrentChat] = useState(null)
+  const currentChatIdRef = useRef(null)
   
   // Initialize socket connection
   useEffect(() => {
@@ -26,7 +29,7 @@ const ChatWindow = ({ selectedChat }) => {
     
     // Listen for new messages
     socket.current.on('message received', (newMessageReceived) => {
-      if (selectedChat && selectedChat._id === newMessageReceived.chat._id) {
+      if (currentChatIdRef.current && currentChatIdRef.current === newMessageReceived.chat._id) {
         setMessages(prev => [...prev, {
           id: newMessageReceived._id,
           text: newMessageReceived.content,
@@ -35,70 +38,87 @@ const ChatWindow = ({ selectedChat }) => {
         }])
       }
     })
-    
     return () => {
       socket.current.disconnect()
     }
   }, [])
   
-  // Fetch messages when chat changes
+  // Resolve or create chat for selected contact
   useEffect(() => {
-    if (selectedChat && selectedChat._id) {
-      setLoading(true)
-      
-      // Join this chat room
-      socket.current.emit('join chat', selectedChat._id)
-      
-      // Fetch messages for this chat
-      fetch(`http://localhost:5000/api/messages/${selectedChat._id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      })
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! Status: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then(data => {
-        if (Array.isArray(data)) {
-          setMessages(data.map(msg => ({
-            id: msg._id,
-            text: msg.content,
-            sender: msg.sender._id === userInfo._id ? 'me' : 'them',
-            time: new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-          })));
-        } else {
-          console.error('Expected array of messages but got:', data);
-          setMessages([]);
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error fetching messages:', err)
-        setLoading(false)
-        setMessages([])
-      })
-    }
+    if (!selectedChat?.id) return
+    const base = 'http://localhost:5000'
+    fetch(`${base}/api/chats`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ userId: selectedChat.id })
+    })
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json()
+    })
+    .then(chat => {
+      setCurrentChat(chat)
+      setCurrentChatId(chat._id)
+    })
+    .catch(err => {
+      console.error('Error accessing chat:', err)
+      setCurrentChat(null)
+      setCurrentChatId(null)
+      setMessages([])
+    })
   }, [selectedChat])
 
+  // Fetch messages when chatId changes
+  useEffect(() => {
+    if (!currentChatId) return
+    setLoading(true)
+    // Join this chat room
+    socket.current.emit('join chat', currentChatId)
+    // Fetch messages for this chat
+    fetch(`http://localhost:5000/api/messages/${currentChatId}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json()
+    })
+    .then(data => {
+      if (Array.isArray(data)) {
+        setMessages(data.map(msg => ({
+          id: msg._id,
+          text: msg.content,
+          sender: msg.sender._id === userInfo._id ? 'me' : 'them',
+          time: new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        })))
+      } else {
+        setMessages([])
+      }
+      setLoading(false)
+    })
+    .catch(err => {
+      console.error('Error fetching messages:', err)
+      setLoading(false)
+      setMessages([])
+    })
+  }, [currentChatId])
+
+  useEffect(() => {
+    currentChatIdRef.current = currentChatId
+  }, [currentChatId])
+
   const handleSendMessage = (text) => {
-    if (!text.trim() || !selectedChat) return
+    if (!text.trim() || !currentChatId) return
     
     const currentTime = new Date()
     const timeString = currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    
-    // Optimistically add message to UI
     const tempId = `temp-${Date.now()}`
-    const newMessage = {
-      id: tempId,
-      text,
-      sender: 'me',
-      time: timeString
-    }
+    const newMessage = { id: tempId, text, sender: 'me', time: timeString }
     setMessages(prev => [...prev, newMessage])
-    
     // Send message to server
     fetch('http://localhost:5000/api/messages', {
       method: 'POST',
@@ -106,39 +126,21 @@ const ChatWindow = ({ selectedChat }) => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       },
-      body: JSON.stringify({
-        content: text,
-        chatId: selectedChat._id
-      })
+      body: JSON.stringify({ content: text, chatId: currentChatId })
     })
-    .then(res => {
-      if (!res.ok) {
-        throw new Error(`HTTP error! Status: ${res.status}`);
-      }
-      return res.json();
-    })
+    .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json() })
     .then(data => {
-      console.log('Message saved successfully:', data);
-      
-      // Replace temp message with confirmed message from server
-      setMessages(prev => prev.map(msg => 
-        msg.id === tempId ? {
-          id: data._id || data.id,
-          text: data.content,
-          sender: 'me',
-          time: new Date(data.createdAt || currentTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-        } : msg
-      ))
-      
-      // Emit socket event for real-time delivery
+      setMessages(prev => prev.map(msg => msg.id === tempId ? {
+        id: data._id || data.id,
+        text: data.content,
+        sender: 'me',
+        time: new Date(data.createdAt || currentTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      } : msg))
       socket.current.emit('new message', data)
     })
     .catch(err => {
       console.error('Error sending message:', err)
-      // Keep the message in UI but mark it as failed
-      setMessages(prev => prev.map(msg => 
-        msg.id === tempId ? {...msg, failed: true} : msg
-      ))
+      setMessages(prev => prev.map(msg => msg.id === tempId ? { ...msg, failed: true } : msg))
     })
   }
 
