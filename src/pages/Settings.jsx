@@ -1,30 +1,110 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Navbar from '../components/Navbar'
+import { useTheme } from '../context/ThemeContext'
+import api from '../utils/api'
 
 const Settings = () => {
   const [notifications, setNotifications] = useState(true)
   const [soundEnabled, setSoundEnabled] = useState(true)
-  const [darkMode, setDarkMode] = useState(false)
+  const { darkMode, toggleDarkMode } = useTheme()
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState(null)
+
+  // Save notification settings to localStorage
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('chatAppSettings');
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings);
+      setNotifications(settings.notifications);
+      setSoundEnabled(settings.soundEnabled);
+    }
+  }, []);
+
+  const saveSettings = () => {
+    const settings = {
+      notifications,
+      soundEnabled
+    };
+    localStorage.setItem('chatAppSettings', JSON.stringify(settings));
+    setMessage({ type: 'success', text: 'Settings saved successfully!' });
+    setTimeout(() => setMessage(null), 3000);
+  };
+
+  const handleDownloadData = async () => {
+    try {
+      setLoading(true);
+      setMessage({ type: 'info', text: 'Preparing your data...' });
+      
+      // Get user info from localStorage
+      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+      if (!userInfo) {
+        setMessage({ type: 'error', text: 'You must be logged in to download your data' });
+        setLoading(false);
+        return;
+      }
+      
+      // Create a simple data object with user information
+      const userData = {
+        user: userInfo,
+        settings: {
+          notifications,
+          soundEnabled,
+          darkMode
+        },
+        exportDate: new Date().toISOString()
+      };
+      
+      // Create a downloadable file
+      const dataStr = JSON.stringify(userData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      
+      // Create download link and trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chat-app-data-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      setMessage({ type: 'success', text: 'Your data has been downloaded!' });
+      setLoading(false);
+    } catch (error) {
+      console.error('Error downloading data:', error);
+      setMessage({ type: 'error', text: 'Failed to download your data. Please try again.' });
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-800'}`}>
       <Navbar />
       <div className="max-w-4xl mx-auto p-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6">Settings</h1>
+        <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'} mb-6`}>Settings</h1>
+
+        {message && (
+          <div className={`mb-4 p-3 rounded-lg ${
+            message.type === 'success' ? 'bg-green-100 text-green-800' : 
+            message.type === 'error' ? 'bg-red-100 text-red-800' : 
+            'bg-blue-100 text-blue-800'
+          }`}>
+            {message.text}
+          </div>
+        )}
 
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Notifications</h2>
+          <div className={`rounded-2xl shadow-sm p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Notifications</h2>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-800">Push Notifications</h3>
-                  <p className="text-sm text-gray-600">Receive notifications about new messages</p>
+                  <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Push Notifications</h3>
+                  <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Receive notifications about new messages</p>
                 </div>
                 <button
                   onClick={() => setNotifications(!notifications)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    notifications ? 'bg-blue-500' : 'bg-gray-300'
+                    notifications ? 'bg-blue-500' : darkMode ? 'bg-gray-600' : 'bg-gray-300'
                   }`}
                 >
                   <span
@@ -37,13 +117,13 @@ const Settings = () => {
 
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-800">Sound</h3>
-                  <p className="text-sm text-gray-600">Play sound for incoming messages</p>
+                  <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Sound</h3>
+                  <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Play sound for incoming messages</p>
                 </div>
                 <button
                   onClick={() => setSoundEnabled(!soundEnabled)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    soundEnabled ? 'bg-blue-500' : 'bg-gray-300'
+                    soundEnabled ? 'bg-blue-500' : darkMode ? 'bg-gray-600' : 'bg-gray-300'
                   }`}
                 >
                   <span
@@ -53,20 +133,27 @@ const Settings = () => {
                   />
                 </button>
               </div>
+              
+              <button 
+                onClick={saveSettings}
+                className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Save Notification Settings
+              </button>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Appearance</h2>
+          <div className={`rounded-2xl shadow-sm p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Appearance</h2>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-medium text-gray-800">Dark Mode</h3>
-                <p className="text-sm text-gray-600">Switch to dark theme</p>
+                <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Dark Mode</h3>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Switch to dark theme</p>
               </div>
               <button
-                onClick={() => setDarkMode(!darkMode)}
+                onClick={toggleDarkMode}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  darkMode ? 'bg-blue-500' : 'bg-gray-300'
+                  darkMode ? 'bg-blue-500' : darkMode ? 'bg-gray-600' : 'bg-gray-300'
                 }`}
               >
                 <span
@@ -78,34 +165,24 @@ const Settings = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Privacy & Security</h2>
+          <div className={`rounded-2xl shadow-sm p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Account</h2>
             <div className="space-y-3">
-              <button className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <h3 className="font-medium text-gray-800">Blocked Users</h3>
-                <p className="text-sm text-gray-600">Manage blocked contacts</p>
-              </button>
-              <button className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <h3 className="font-medium text-gray-800">Privacy Settings</h3>
-                <p className="text-sm text-gray-600">Control who can see your information</p>
-              </button>
-              <button className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <h3 className="font-medium text-gray-800">Change Password</h3>
-                <p className="text-sm text-gray-600">Update your account password</p>
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Account</h2>
-            <div className="space-y-3">
-              <button className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                <h3 className="font-medium text-gray-800">Download My Data</h3>
-                <p className="text-sm text-gray-600">Request a copy of your data</p>
-              </button>
-              <button className="w-full text-left px-4 py-3 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
-                <h3 className="font-medium text-red-600">Delete Account</h3>
-                <p className="text-sm text-red-500">Permanently delete your account</p>
+              <button 
+                onClick={handleDownloadData}
+                disabled={loading}
+                className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                  darkMode 
+                    ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                    : 'bg-gray-50 hover:bg-gray-100 text-gray-800'
+                }`}
+              >
+                <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                  {loading ? 'Preparing Download...' : 'Download My Data'}
+                </h3>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  Get a copy of your personal data
+                </p>
               </button>
             </div>
           </div>
