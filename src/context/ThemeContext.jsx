@@ -3,13 +3,14 @@ import { createContext, useState, useContext, useEffect } from 'react';
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  // Check if dark mode preference exists in localStorage, otherwise use system preference
+  // Check if dark mode was previously set in localStorage or default to light mode
   const [darkMode, setDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('darkMode');
     if (savedTheme !== null) {
       return savedTheme === 'true';
     }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Default to light mode
+    return false;
   });
 
   // Update the theme when darkMode state changes

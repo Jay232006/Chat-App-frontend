@@ -84,9 +84,9 @@ const Settings = () => {
 
         {message && (
           <div className={`mb-4 p-3 rounded-lg ${
-            message.type === 'success' ? 'bg-green-100 text-green-800' : 
-            message.type === 'error' ? 'bg-red-100 text-red-800' : 
-            'bg-blue-100 text-blue-800'
+            message.type === 'success' ? darkMode ? 'bg-green-900 text-green-100' : 'bg-green-100 text-green-800' : 
+            message.type === 'error' ? darkMode ? 'bg-red-900 text-red-100' : 'bg-red-100 text-red-800' : 
+            darkMode ? 'bg-blue-900 text-blue-100' : 'bg-blue-100 text-blue-800'
           }`}>
             {message.text}
           </div>
@@ -173,7 +173,7 @@ const Settings = () => {
                 disabled={loading}
                 className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
                   darkMode 
-                    ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' 
                     : 'bg-gray-50 hover:bg-gray-100 text-gray-800'
                 }`}
               >
