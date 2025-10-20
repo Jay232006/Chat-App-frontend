@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "start": "cross-env PORT=5173 react-scripts start",
     "build": "vite build",
     "preview": "vite preview"
   },
