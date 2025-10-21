@@ -2,21 +2,25 @@ import React, { useState, useEffect, useRef, useContext } from 'react'
 import MessageInput from './MessageInput'
 import { io } from 'socket.io-client'
 import { ThemeContext } from '../context/ThemeContext'
+import { AuthContext } from '../context/AuthContext'
 
 const ChatWindow = ({ selectedChat }) => {
   const { darkMode } = useContext(ThemeContext)
-  // const { user: authUser } = useContext(AuthContext || React.createContext(null)) // safe fallback
+  const { user: authUser, token: authToken } = useContext(AuthContext)
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const socket = useRef(null)
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-  const token = localStorage.getItem('token') || null
-  const userInfo = JSON.parse(localStorage.getItem('userInfo') || 'null') || authUser || null
+  const token = authToken
+  const userInfo = authUser
 
   // New / missing state and refs
-  const [currentChatId, setCurrentChatId] = useState(null)
+  const [currentChatId, setCurrentChatId] = useState(() => {
+    // Try to load saved chat ID from localStorage on initial render
+    return localStorage.getItem('currentChatId') || null
+  })
   const [currentChat, setCurrentChat] = useState(null)
   const currentChatIdRef = useRef(null)
 
@@ -26,10 +30,35 @@ const ChatWindow = ({ selectedChat }) => {
 
   // Socket init
   useEffect(() => {
-    socket.current = io(API_BASE, { withCredentials: true })
+    if (!token) {
+      console.error('No authentication token available for socket connection');
+      setError('Authentication required. Please log in again.');
+      return;
+    }
+    
+    socket.current = io(API_BASE, { 
+      withCredentials: true,
+      auth: {
+        token: token
+      }
+    })
+    
+    // Set up socket event listeners
+    socket.current.on('connect', () => {
+      console.log('Socket connected successfully')
+    })
+    
+    socket.current.on('connect_error', (error) => {
+      console.error('Socket connection error:', error.message)
+      setError('Failed to connect to chat server: ' + error.message)
+    })
+    
+    socket.current.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason)
+    })
+    
     if (userInfo && socket.current) {
       socket.current.emit('setup', userInfo)
-      socket.current.on('connected', () => console.log('Socket connected'))
     }
 
     const onMessageReceived = (newMessage) => {
@@ -57,27 +86,76 @@ const ChatWindow = ({ selectedChat }) => {
   useEffect(() => {
     if (!selectedChat?.id) return
     setError(null)
+    // Clear messages when switching contacts
+    setMessages([])
+    setCurrentChat(null)
+    setCurrentChatId(null)
+    localStorage.removeItem('currentChatId')
     const ctrl = new AbortController()
 
     async function resolveChat() {
       try {
-        const res = await fetch(`${API_BASE}/api/chats`, {
-          method: 'POST',
+        // First try to get existing chat
+        let chat;
+        // Find chat for the selected contact
+        const getRes = await fetch(`${API_BASE}/api/chats`, {
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
+            'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ userId: selectedChat.id }),
           signal: ctrl.signal
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const chat = await res.json()
-        setCurrentChat(chat)
-        setCurrentChatId(chat._id)
+        });
+        
+        if (getRes.ok) {
+          const allChats = await getRes.json();
+          // Find the chat with the selected contact
+          chat = allChats.find(c => 
+            c.users.some(u => u._id === selectedChat.id)
+          );
+        } else {
+          console.error(`Failed to get chats: ${getRes.status}`);
+        }
+        
+        // If no existing chat found, create a new one
+        if (!chat) {
+          console.log("Creating new chat with user:", selectedChat.id);
+          
+          if (!token) {
+            throw new Error('Authentication token is missing. Please log in again.');
+          }
+          
+          const res = await fetch(`${API_BASE}/api/chats`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ userId: selectedChat.id }),
+            signal: ctrl.signal
+          });
+          
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            console.error(`HTTP ${res.status}:`, errorData.message || 'Unknown error');
+            throw new Error(errorData.message || `Failed to create chat (${res.status})`);
+          }
+          chat = await res.json();
+        }
+        
+        setCurrentChat(chat);
+        setCurrentChatId(chat._id);
+        
+        // Store chat ID in localStorage for persistence across refreshes
+        localStorage.setItem('currentChatId', chat._id);
+        
+        // Join the chat room via socket
+        if (socket.current && chat._id) {
+          socket.current.emit("join chat", chat._id);
+        }
       } catch (err) {
         if (err.name !== 'AbortError') {
-          console.error('Error accessing chat:', err)
-          setError(err.message || 'Failed to access chat')
+          console.error('Error accessing chat:', err);
+          setError(err.message || 'Failed to access chat');
           setCurrentChat(null)
           setCurrentChatId(null)
           setMessages([])
@@ -97,10 +175,24 @@ const ChatWindow = ({ selectedChat }) => {
     const ctrl = new AbortController()
 
     if (socket.current) socket.current.emit('join chat', currentChatId)
+    
+    // Try to load cached messages first for immediate display
+    const cachedMessages = localStorage.getItem(`messages_${currentChatId}`);
+    if (cachedMessages) {
+      try {
+        const parsedMessages = JSON.parse(cachedMessages);
+        setMessages(parsedMessages);
+      } catch (e) {
+        console.error("Error parsing cached messages:", e);
+      }
+    }
+    
+    // Always fetch fresh messages from the database, even if we have cached messages
+    // This ensures we have the latest messages when the user logs in again
 
     fetch(`${API_BASE}/api/messages/${currentChatId}`, {
       headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
+        'Authorization': `Bearer ${token}`
       },
       signal: ctrl.signal
     })
@@ -110,16 +202,27 @@ const ChatWindow = ({ selectedChat }) => {
       })
       .then(data => {
         if (Array.isArray(data)) {
-          setMessages(data.map(msg => ({
+          const formattedMessages = data.map(msg => ({
             id: msg._id,
             text: msg.content,
             sender: msg.sender._id === (userInfo?._id) ? 'me' : 'them',
             time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          })))
+          }));
+          
+          setMessages(formattedMessages);
+          
+          // Store messages in localStorage for persistence across refreshes
+          if (currentChatId) {
+            localStorage.setItem(`messages_${currentChatId}`, JSON.stringify(formattedMessages));
+          }
         } else {
-          setMessages([])
+          setMessages([]);
+          // Clear stored messages if none returned
+          if (currentChatId) {
+            localStorage.removeItem(`messages_${currentChatId}`);
+          }
         }
-        setLoading(false)
+        setLoading(false);
       })
       .catch(err => {
         if (err.name !== 'AbortError') {
@@ -130,7 +233,26 @@ const ChatWindow = ({ selectedChat }) => {
         }
       })
 
-    return () => ctrl.abort()
+    // Set up socket listener for new messages
+    if (socket.current) {
+      socket.current.on('message received', (newMessageReceived) => {
+        if (newMessageReceived.chat._id === currentChatId) {
+          setMessages(prev => [...prev, {
+            id: newMessageReceived._id,
+            text: newMessageReceived.content,
+            sender: newMessageReceived.sender._id === (userInfo?._id) ? 'me' : 'them',
+            time: new Date(newMessageReceived.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }])
+        }
+      })
+    }
+
+    return () => {
+      ctrl.abort();
+      if (socket.current) {
+        socket.current.off('message received');
+      }
+    }
   }, [currentChatId, API_BASE, token, userInfo])
 
   const handleSendMessage = async (text) => {
@@ -144,7 +266,7 @@ const ChatWindow = ({ selectedChat }) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({ userId: selectedChat.id })
         })
@@ -153,6 +275,11 @@ const ChatWindow = ({ selectedChat }) => {
         setCurrentChat(chat)
         setCurrentChatId(chat._id)
         chatId = chat._id
+        
+        // Join the chat room via socket
+        if (socket.current && chat._id) {
+          socket.current.emit("join chat", chat._id);
+        }
       } catch (err) {
         console.error('Failed to resolve chat before sending:', err)
         return
@@ -165,26 +292,51 @@ const ChatWindow = ({ selectedChat }) => {
     setMessages(prev => [...prev, newMessage])
 
     try {
+      // Send message to the server to store in database
       const res = await fetch(`${API_BASE}/api/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ content: text, chatId })
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error(`Failed to send message: ${res.status}`, errorData);
+        throw new Error(errorData.message || `Failed to send message (${res.status})`);
+      }
+      
+      const data = await res.json();
+      console.log("Message successfully saved to database:", data);
+      
+      // Update the message in the UI with the server-generated ID and timestamp
       setMessages(prev => prev.map(msg => msg.id === tempId ? {
         id: data._id || data.id,
         text: data.content,
         sender: 'me',
         time: new Date(data.createdAt || currentTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      } : msg))
-      if (socket.current) socket.current.emit('new message', data)
+      } : msg));
+      
+      // Update localStorage with the latest messages
+      const updatedMessages = messages.map(msg => 
+        msg.id === tempId ? {
+          id: data._id || data.id,
+          text: data.content,
+          sender: 'me',
+          time: new Date(data.createdAt || currentTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        } : msg
+      );
+      localStorage.setItem(`messages_${chatId}`, JSON.stringify(updatedMessages));
+      
+      // Emit the new message to other users via socket
+      if (socket.current) socket.current.emit('new message', data);
     } catch (err) {
-      console.error('Error sending message:', err)
-      setMessages(prev => prev.map(msg => msg.id === tempId ? { ...msg, failed: true } : msg))
+      console.error('Error sending message:', err);
+      setMessages(prev => prev.map(msg => msg.id === tempId ? { ...msg, failed: true } : msg));
+      // Show error to user
+      setError(`Failed to send message: ${err.message}`);
     }
   }
 

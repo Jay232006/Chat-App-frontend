@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useState, useContext } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import API from "../utils/api";
+import { AuthContext } from '../context/AuthContext';
 
 const Login = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const navigate = useNavigate()
+  const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -16,12 +18,15 @@ const Login = () => {
 
     try {
       const response = await API.post('/auth/login', { email, password });
-      // Store token and user info for authenticated requests
-      localStorage.setItem('userToken', response.data.token);
+      // Use AuthContext to store authentication data
+      login(response.data.user, response.data.token);
+      // Also store in localStorage as backup
+      localStorage.setItem('token', response.data.token);
       localStorage.setItem('userInfo', JSON.stringify(response.data.user));
       console.log('Login successful:', response.data);
       navigate('/chat');
     } catch (err) {
+      console.error('Login error:', err);
       setError(err.response?.data?.message || 'An error occurred during login.');
     } finally {
       setLoading(false);
