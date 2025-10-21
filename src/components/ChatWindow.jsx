@@ -258,6 +258,12 @@ const ChatWindow = ({ selectedChat }) => {
   const handleSendMessage = async (text) => {
     if (!text.trim()) return
 
+    // Guard: ensure we have token
+    if (!token) {
+      setError('Authentication required. Please log in again.')
+      return
+    }
+
     let chatId = currentChatId
     if (!chatId && selectedChat?.id) {
       // resolve chat first (same as above)
@@ -282,8 +288,15 @@ const ChatWindow = ({ selectedChat }) => {
         }
       } catch (err) {
         console.error('Failed to resolve chat before sending:', err)
+        setError('Could not resolve chat with the selected contact.')
         return
       }
+    }
+
+    // Guard: ensure chatId was resolved
+    if (!chatId) {
+      setError('No chat available to send message.')
+      return
     }
 
     const currentTime = new Date()
@@ -303,9 +316,13 @@ const ChatWindow = ({ selectedChat }) => {
       })
       
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        console.error(`Failed to send message: ${res.status}`, errorData);
-        throw new Error(errorData.message || `Failed to send message (${res.status})`);
+        // Try to extract error body and status for better feedback
+        const status = res.status
+        const errorText = await res.text().catch(() => '')
+        let errorData = {}
+        try { errorData = JSON.parse(errorText) } catch {}
+        console.error(`Failed to send message: ${status}`, errorData || errorText)
+        throw new Error(errorData.message || `Failed to send message (${status})`)
       }
       
       const data = await res.json();
@@ -320,7 +337,7 @@ const ChatWindow = ({ selectedChat }) => {
       } : msg));
       
       // Update localStorage with the latest messages
-      const updatedMessages = messages.map(msg => 
+      const updatedMessages = (messages || []).map(msg => 
         msg.id === tempId ? {
           id: data._id || data.id,
           text: data.content,

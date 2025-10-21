@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import Navbar from '../components/Navbar'
 import API from '../utils/api'
 import { useTheme } from '../context/ThemeContext'
+import { useAuth } from '../context/AuthContext'
 
 const Profile = () => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showAlerts, setShowAlerts] = useState({ phone: false, bio: false })
   const { darkMode } = useTheme()
+  const { token, updateUser } = useAuth()
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -17,33 +20,46 @@ const Profile = () => {
   })
 
   useEffect(() => {
-    // Get user data from localStorage
-    const userInfo = localStorage.getItem('userInfo')
-    const profileData = localStorage.getItem('profileData')
-    
-    if (userInfo) {
-      const parsedUser = JSON.parse(userInfo)
-      setUser(parsedUser)
-      
-      // Initialize form data with user info and saved profile data if available
-      if (profileData) {
-        setFormData(JSON.parse(profileData))
-      } else {
-        setFormData({
-          username: parsedUser.username || '',
-          email: parsedUser.email || '',
-          phone: parsedUser.phone || '',
-          location: parsedUser.location || '',
-          bio: parsedUser.bio || ''
-        })
+    fetchUserProfile()
+  }, [])
+
+  const fetchUserProfile = async () => {
+    try {
+      if (!token) {
+        setError('You must be logged in to view your profile')
+        setLoading(false)
+        return
       }
+
+      const response = await API.get('/users/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      const userData = response.data
+      setUser(userData)
+      setFormData({
+        username: userData.username || '',
+        email: userData.email || '',
+        phone: userData.phone || '',
+        location: userData.location || '',
+        bio: userData.bio || ''
+      })
+
+      // Show mini alerts for empty fields after a short delay
+      setTimeout(() => {
+        setShowAlerts({
+          phone: !userData.phone,
+          bio: !userData.bio
+        })
+      }, 1000)
       
       setLoading(false)
-    } else {
-      setError('User not logged in')
+    } catch (err) {
+      console.error('Failed to fetch user profile:', err)
+      setError(err.response?.data?.message || 'Failed to load profile')
       setLoading(false)
     }
-  }, [])
+  }
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -51,12 +67,19 @@ const Profile = () => {
       ...formData,
       [name]: value
     })
+
+    // Hide alert when user starts typing in empty fields
+    if (name === 'phone' && showAlerts.phone && value.trim()) {
+      setShowAlerts(prev => ({ ...prev, phone: false }))
+    }
+    if (name === 'bio' && showAlerts.bio && value.trim()) {
+      setShowAlerts(prev => ({ ...prev, bio: false }))
+    }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const token = localStorage.getItem('userToken')
       if (!token) {
         setError('You must be logged in to update your profile')
         return
@@ -67,12 +90,17 @@ const Profile = () => {
         headers: { Authorization: `Bearer ${token}` }
       })
       
-      // Update user state and localStorage with new data
-      setUser(response.data.user)
-      localStorage.setItem('userInfo', JSON.stringify(response.data.user))
+      // Update user state and AuthContext with new data
+      const updatedUser = response.data.user
+      setUser(updatedUser)
+      updateUser(updatedUser)
       
-      // Save profile data to localStorage to persist between refreshes
-      localStorage.setItem('profileData', JSON.stringify(formData))
+      // Hide alerts after successful update
+      setShowAlerts({ phone: false, bio: false })
+      
+      // Show success message briefly
+      setError(null)
+      
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update profile')
     } finally {
@@ -82,10 +110,10 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
         <Navbar />
         <div className="max-w-4xl mx-auto p-6 flex justify-center items-center">
-          <p>Loading profile...</p>
+          <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>Loading profile...</p>
         </div>
       </div>
     )
@@ -93,7 +121,7 @@ const Profile = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
         <Navbar />
         <div className="max-w-4xl mx-auto p-6">
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
@@ -146,7 +174,7 @@ const Profile = () => {
                     name="username"
                     value={formData.username}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-2 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    className={`w-full px-4 py-2 ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-900'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   />
                 </div>
                 <div>
@@ -156,10 +184,10 @@ const Profile = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-2 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    className={`w-full px-4 py-2 ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-900'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   />
                 </div>
-                <div>
+                <div className="relative">
                   <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Phone</label>
                   <input
                     type="tel"
@@ -167,8 +195,13 @@ const Profile = () => {
                     value={formData.phone}
                     onChange={handleInputChange}
                     placeholder="Enter your phone number"
-                    className={`w-full px-4 py-2 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    className={`w-full px-4 py-2 ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-900'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   />
+                  {showAlerts.phone && (
+                    <div className="absolute -bottom-6 left-0 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded shadow-sm border border-amber-200 animate-pulse">
+                      Add your phone number to complete your profile
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Location</label>
@@ -178,13 +211,13 @@ const Profile = () => {
                     value={formData.location}
                     onChange={handleInputChange}
                     placeholder="Enter your location"
-                    className={`w-full px-4 py-2 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    className={`w-full px-4 py-2 ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-900'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   />
                 </div>
               </div>
             </div>
 
-            <div>
+            <div className="relative">
               <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Bio</label>
               <textarea
                 rows="4"
@@ -192,22 +225,29 @@ const Profile = () => {
                 value={formData.bio}
                 onChange={handleInputChange}
                 placeholder="Tell us about yourself"
-                className={`w-full px-4 py-2 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full px-4 py-2 ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-900'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
+              {showAlerts.bio && (
+                <div className="absolute -bottom-6 left-0 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded shadow-sm border border-amber-200 animate-pulse">
+                  Add a bio to let others know more about you
+                </div>
+              )}
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex gap-4 mt-8">
               <button 
                 type="submit"
-                className="px-6 py-2 bg-blue-500 text-gray-200 rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                disabled={loading}
+                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium disabled:opacity-50"
               >
-                Save Changes
+                {loading ? 'Saving...' : 'Save Changes'}
               </button>
               <button 
                 type="button"
+                onClick={() => fetchUserProfile()}
                 className={`px-6 py-2 ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} rounded-lg transition-colors font-medium`}
               >
-                Cancel
+                Reset
               </button>
             </div>
           </form>
