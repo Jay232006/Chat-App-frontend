@@ -1,128 +1,150 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useContext } from 'react'
 import MessageInput from './MessageInput'
 import { io } from 'socket.io-client'
-import { useTheme } from '../context/ThemeContext'
+import { ThemeContext } from '../context/ThemeContext'
 
 const ChatWindow = ({ selectedChat }) => {
+  const { darkMode } = useContext(ThemeContext)
+  // const { user: authUser } = useContext(AuthContext || React.createContext(null)) // safe fallback
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
-  const { darkMode } = useTheme()
-  const socket = useRef()
-  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+  const [error, setError] = useState(null)
+
+  const socket = useRef(null)
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+  const token = localStorage.getItem('token') || null
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || 'null') || authUser || null
+
+  // New / missing state and refs
   const [currentChatId, setCurrentChatId] = useState(null)
   const [currentChat, setCurrentChat] = useState(null)
   const currentChatIdRef = useRef(null)
-  
-  // Initialize socket connection
-  useEffect(() => {
-    socket.current = io(API_BASE)
-    
-    // Setup user connection
-    if (userInfo && userInfo._id) {
-      socket.current.emit('setup', userInfo)
-      
-      // Listen for connection confirmation
-      socket.current.on('connected', () => {
-        console.log('Socket connected')
-      })
-    }
-    
-    // Listen for new messages
-    socket.current.on('message received', (newMessageReceived) => {
-      if (currentChatIdRef.current && currentChatIdRef.current === newMessageReceived.chat._id) {
-        setMessages(prev => [...prev, {
-          id: newMessageReceived._id,
-          text: newMessageReceived.content,
-          sender: newMessageReceived.sender._id === userInfo._id ? 'me' : 'them',
-          time: new Date(newMessageReceived.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-        }])
-      }
-    })
-    return () => {
-      socket.current.disconnect()
-    }
-  }, [])
-  
-  // Resolve or create chat for selected contact
-  useEffect(() => {
-    if (!selectedChat?.id) return
-    fetch(`${API_BASE}/api/chats`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({ userId: selectedChat.id })
-    })
-    .then(res => {
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return res.json()
-    })
-    .then(chat => {
-      setCurrentChat(chat)
-      setCurrentChatId(chat._id)
-    })
-    .catch(err => {
-      console.error('Error accessing chat:', err)
-      setCurrentChat(null)
-      setCurrentChatId(null)
-      setMessages([])
-    })
-  }, [selectedChat])
-
-  // Fetch messages when chatId changes
-  useEffect(() => {
-    if (!currentChatId) return
-    setLoading(true)
-    // Join this chat room
-    socket.current.emit('join chat', currentChatId)
-    // Fetch messages for this chat
-    fetch(`${API_BASE}/api/messages/${currentChatId}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    .then(res => {
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return res.json()
-    })
-    .then(data => {
-      if (Array.isArray(data)) {
-        setMessages(data.map(msg => ({
-          id: msg._id,
-          text: msg.content,
-          sender: msg.sender._id === userInfo._id ? 'me' : 'them',
-          time: new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-        })))
-      } else {
-        setMessages([])
-      }
-      setLoading(false)
-    })
-    .catch(err => {
-      console.error('Error fetching messages:', err)
-      setLoading(false)
-      setMessages([])
-    })
-  }, [currentChatId])
 
   useEffect(() => {
     currentChatIdRef.current = currentChatId
   }, [currentChatId])
 
-  const handleSendMessage = async (text) => {
-    if (!text.trim()) return
+  // Socket init
+  useEffect(() => {
+    socket.current = io(API_BASE, { withCredentials: true })
+    if (userInfo && socket.current) {
+      socket.current.emit('setup', userInfo)
+      socket.current.on('connected', () => console.log('Socket connected'))
+    }
 
-    let chatId = currentChatId
-    // Resolve chatId on-demand if missing
-    if (!chatId && selectedChat?.id) {
+    const onMessageReceived = (newMessage) => {
+      if (currentChatIdRef.current && newMessage.chat && currentChatIdRef.current === newMessage.chat._id) {
+        setMessages(prev => [...prev, {
+          id: newMessage._id,
+          text: newMessage.content,
+          sender: newMessage.sender._id === (userInfo?._id) ? 'me' : 'them',
+          time: new Date(newMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }])
+      }
+    }
+
+    socket.current.on('message received', onMessageReceived)
+
+    return () => {
+      if (socket.current) {
+        socket.current.off('message received', onMessageReceived)
+        socket.current.disconnect()
+      }
+    }
+  }, [API_BASE, userInfo])
+
+  // Resolve or create chat for selected contact (POST)
+  useEffect(() => {
+    if (!selectedChat?.id) return
+    setError(null)
+    const ctrl = new AbortController()
+
+    async function resolveChat() {
       try {
         const res = await fetch(`${API_BASE}/api/chats`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ userId: selectedChat.id }),
+          signal: ctrl.signal
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const chat = await res.json()
+        setCurrentChat(chat)
+        setCurrentChatId(chat._id)
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Error accessing chat:', err)
+          setError(err.message || 'Failed to access chat')
+          setCurrentChat(null)
+          setCurrentChatId(null)
+          setMessages([])
+        }
+      }
+    }
+
+    resolveChat()
+    return () => ctrl.abort()
+  }, [selectedChat, API_BASE, token])
+
+  // Fetch messages when chatId changes (GET /api/messages/:chatId)
+  useEffect(() => {
+    if (!currentChatId) return
+    setLoading(true)
+    setError(null)
+    const ctrl = new AbortController()
+
+    if (socket.current) socket.current.emit('join chat', currentChatId)
+
+    fetch(`${API_BASE}/api/messages/${currentChatId}`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      signal: ctrl.signal
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then(data => {
+        if (Array.isArray(data)) {
+          setMessages(data.map(msg => ({
+            id: msg._id,
+            text: msg.content,
+            sender: msg.sender._id === (userInfo?._id) ? 'me' : 'them',
+            time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          })))
+        } else {
+          setMessages([])
+        }
+        setLoading(false)
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          console.error('Error fetching messages:', err)
+          setError(err.message || 'Failed to fetch messages')
+          setLoading(false)
+          setMessages([])
+        }
+      })
+
+    return () => ctrl.abort()
+  }, [currentChatId, API_BASE, token, userInfo])
+
+  const handleSendMessage = async (text) => {
+    if (!text.trim()) return
+
+    let chatId = currentChatId
+    if (!chatId && selectedChat?.id) {
+      // resolve chat first (same as above)
+      try {
+        const res = await fetch(`${API_BASE}/api/chats`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
           },
           body: JSON.stringify({ userId: selectedChat.id })
         })
@@ -138,9 +160,8 @@ const ChatWindow = ({ selectedChat }) => {
     }
 
     const currentTime = new Date()
-    const timeString = currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     const tempId = `temp-${Date.now()}`
-    const newMessage = { id: tempId, text, sender: 'me', time: timeString }
+    const newMessage = { id: tempId, text, sender: 'me', time: currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
     setMessages(prev => [...prev, newMessage])
 
     try {
@@ -148,7 +169,7 @@ const ChatWindow = ({ selectedChat }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ content: text, chatId })
       })
@@ -158,9 +179,9 @@ const ChatWindow = ({ selectedChat }) => {
         id: data._id || data.id,
         text: data.content,
         sender: 'me',
-        time: new Date(data.createdAt || currentTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        time: new Date(data.createdAt || currentTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       } : msg))
-      socket.current.emit('new message', data)
+      if (socket.current) socket.current.emit('new message', data)
     } catch (err) {
       console.error('Error sending message:', err)
       setMessages(prev => prev.map(msg => msg.id === tempId ? { ...msg, failed: true } : msg))
@@ -171,11 +192,8 @@ const ChatWindow = ({ selectedChat }) => {
     return (
       <div className={`flex-1 flex items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
         <div className="text-center">
-          <svg className={`w-24 h-24 mx-auto ${darkMode ? 'text-gray-600' : 'text-gray-300'} mb-4`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
           <h2 className={`text-xl ${darkMode ? 'text-gray-300' : 'text-gray-600'} font-medium`}>Select a conversation</h2>
-          <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-2`}>Choose from your existing conversations or start a new one</p>
+          {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
         </div>
       </div>
     )
@@ -187,11 +205,8 @@ const ChatWindow = ({ selectedChat }) => {
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-gray-200 font-semibold">
-              {selectedChat.name.charAt(0)}
+              {selectedChat.name?.charAt(0)}
             </div>
-            {selectedChat.online && (
-              <div className={`absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 ${darkMode ? 'border-gray-800' : 'border-white'}`}></div>
-            )}
           </div>
           <div>
             <h2 className={`font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{selectedChat.name}</h2>
@@ -211,29 +226,17 @@ const ChatWindow = ({ selectedChat }) => {
           </div>
         ) : (
           messages.map(message => (
-            <div
-              key={message.id}
-              className={`flex ${message.sender === 'me' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`max-w-xs lg:max-w-md xl:max-w-lg ${message.sender === 'me' ? 'order-2' : 'order-1'}`}>
-                <div
-                  className={`px-4 py-2 rounded-2xl ${
-                    message.sender === 'me'
-                      ? 'bg-blue-500 text-gray-200 rounded-br-sm'
-                      : darkMode 
-                        ? 'bg-gray-700 text-gray-200 rounded-bl-sm border border-gray-600' 
-                        : 'bg-white text-gray-800 rounded-bl-sm border border-gray-200'
-                  }`}
-                >
+            <div key={message.id} className={`flex ${message.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs lg:max-w-md xl:max-w-lg`}>
+                <div className={`px-4 py-2 rounded-2xl ${message.sender === 'me' ? 'bg-blue-500 text-gray-200' : (darkMode ? 'bg-gray-700 text-gray-200' : 'bg-white text-gray-800')}`}>
                   <p className="break-words">{message.text}</p>
                 </div>
-                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1 ${message.sender === 'me' ? 'text-right' : 'text-left'}`}>
-                  {message.time}
-                </p>
+                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1 ${message.sender === 'me' ? 'text-right' : 'text-left'}`}>{message.time}</p>
               </div>
             </div>
           ))
         )}
+        {error && <div className="text-sm text-red-500">{error}</div>}
       </div>
 
       <MessageInput onSendMessage={handleSendMessage} />

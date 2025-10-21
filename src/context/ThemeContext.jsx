@@ -1,6 +1,6 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 
-const ThemeContext = createContext();
+export const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
   // Check if dark mode was previously set in localStorage or default to light mode
