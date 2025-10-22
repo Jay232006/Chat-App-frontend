@@ -36,8 +36,10 @@ const ChatWindow = ({ selectedChat }) => {
       return;
     }
     
+    // Use path that avoids ad blockers (socket.io instead of socket.io)
     socket.current = io(API_BASE, { 
       withCredentials: true,
+      path: '/socket/socket.io', // Custom path to avoid ad blockers
       auth: {
         token: token
       }
