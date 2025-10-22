@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { AuthContext } from '../context/AuthContext';
 
 const ChatList = ({ selectedChat, onSelectChat }) => {
   const { darkMode } = useTheme();
+  const { user: authUser } = useContext(AuthContext);
   const [searchQuery, setSearchQuery] = useState('');
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,8 +19,10 @@ const ChatList = ({ selectedChat, onSelectChat }) => {
         const res = await fetch(`${base}/api/users`, { signal: ctrl.signal });
         if (!res.ok) throw new Error('Failed to load users');
         const users = await res.json();
+        // Remove the currently logged-in user from the chat list
+        const visibleUsers = authUser ? users.filter(u => u._id !== authUser._id) : users;
         // map server users to UI shape
-        const items = users.map(u => ({
+        const items = visibleUsers.map(u => ({
           id: u._id,
           name: u.username,
           lastMessage: '',
@@ -35,7 +39,7 @@ const ChatList = ({ selectedChat, onSelectChat }) => {
     }
     loadUsers();
     return () => ctrl.abort();
-  }, []);
+  }, [authUser]);
 
   const filteredChats = chats.filter(chat =>
     chat.name.toLowerCase().includes(searchQuery.toLowerCase())
