@@ -12,7 +12,7 @@ const ChatWindow = ({ selectedChat }) => {
   const [error, setError] = useState(null)
 
   const socket = useRef(null)
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+  const API_BASE = import.meta.env.VITE_API_URL
   const token = authToken
   const userInfo = authUser
 
