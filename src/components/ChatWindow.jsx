@@ -176,20 +176,9 @@ const ChatWindow = ({ selectedChat }) => {
 
     if (socket.current) socket.current.emit('join chat', currentChatId)
     
-    // Try to load cached messages first for immediate display
-    const cachedMessages = localStorage.getItem(`messages_${currentChatId}`);
-    if (cachedMessages) {
-      try {
-        const parsedMessages = JSON.parse(cachedMessages);
-        setMessages(parsedMessages);
-      } catch (e) {
-        console.error("Error parsing cached messages:", e);
-      }
-    }
+    // Clear previous messages when changing chats
+    setMessages([])
     
-    // Always fetch fresh messages from the database, even if we have cached messages
-    // This ensures we have the latest messages when the user logs in again
-
     fetch(`${API_BASE}/api/messages/${currentChatId}`, {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -201,58 +190,27 @@ const ChatWindow = ({ selectedChat }) => {
         return res.json()
       })
       .then(data => {
-        if (Array.isArray(data)) {
-          const formattedMessages = data.map(msg => ({
-            id: msg._id,
-            text: msg.content,
-            sender: msg.sender._id === (userInfo?._id) ? 'me' : 'them',
-            time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }));
-          
-          setMessages(formattedMessages);
-          
-          // Store messages in localStorage for persistence across refreshes
-          if (currentChatId) {
-            localStorage.setItem(`messages_${currentChatId}`, JSON.stringify(formattedMessages));
-          }
-        } else {
-          setMessages([]);
-          // Clear stored messages if none returned
-          if (currentChatId) {
-            localStorage.removeItem(`messages_${currentChatId}`);
-          }
-        }
-        setLoading(false);
+        const formattedMessages = data.map(msg => ({
+          id: msg._id,
+          text: msg.content,
+          sender: msg.sender._id === (userInfo?._id) ? 'me' : 'them',
+          senderName: msg.sender.username,
+          time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }))
+        setMessages(formattedMessages)
+        // Cache messages for this chat
+        localStorage.setItem(`messages_${currentChatId}`, JSON.stringify(formattedMessages))
+        setLoading(false)
       })
       .catch(err => {
         if (err.name !== 'AbortError') {
           console.error('Error fetching messages:', err)
-          setError(err.message || 'Failed to fetch messages')
+          setError('Failed to load messages: ' + err.message)
           setLoading(false)
-          setMessages([])
         }
       })
 
-    // Set up socket listener for new messages
-    if (socket.current) {
-      socket.current.on('message received', (newMessageReceived) => {
-        if (newMessageReceived.chat._id === currentChatId) {
-          setMessages(prev => [...prev, {
-            id: newMessageReceived._id,
-            text: newMessageReceived.content,
-            sender: newMessageReceived.sender._id === (userInfo?._id) ? 'me' : 'them',
-            time: new Date(newMessageReceived.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }])
-        }
-      })
-    }
-
-    return () => {
-      ctrl.abort();
-      if (socket.current) {
-        socket.current.off('message received');
-      }
-    }
+    return () => ctrl.abort()
   }, [currentChatId, API_BASE, token, userInfo])
 
   const handleSendMessage = async (text) => {
@@ -414,3 +372,41 @@ const ChatWindow = ({ selectedChat }) => {
 }
 
 export default ChatWindow
+
+// Message bubble component
+const MessageBubble = ({ message }) => {
+  const isMe = message.sender === 'me'
+  
+  return (
+    <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-4`}>
+      <div
+        className={`max-w-[70%] px-4 py-2 rounded-lg ${
+          isMe
+            ? `${darkMode ? 'bg-blue-600' : 'bg-blue-500'} text-white`
+            : darkMode
+            ? 'bg-gray-700 text-gray-200'
+            : 'bg-gray-200 text-gray-800'
+        }`}
+      >
+        {/* Only show sender name for messages from others, not from current user */}
+        {!isMe && message.senderName && (
+          <div className="text-xs font-semibold mb-1">
+            {message.senderName}
+          </div>
+        )}
+        <p>{message.text}</p>
+        <div
+          className={`text-xs mt-1 text-right ${
+            isMe
+              ? 'text-blue-100'
+              : darkMode
+              ? 'text-gray-400'
+              : 'text-gray-500'
+          }`}
+        >
+          {message.time}
+        </div>
+      </div>
+    </div>
+  )
+}

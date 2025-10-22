@@ -31,11 +31,23 @@ const Profile = () => {
         return
       }
 
+      console.log("Fetching profile with token:", token)
       const response = await API.get('/users/me', {
         headers: { Authorization: `Bearer ${token}` }
       })
       
-      const userData = response.data
+      console.log("Profile response:", response.data)
+      
+      // Check if response.data.user exists, otherwise use response.data directly
+      const userData = response.data.user || response.data
+      
+      if (!userData) {
+        console.error("Invalid user data format:", response.data)
+        setError('Failed to load profile: invalid server response')
+        setLoading(false)
+        return
+      }
+
       setUser(userData)
       setFormData({
         username: userData.username || '',
@@ -53,6 +65,7 @@ const Profile = () => {
         })
       }, 1000)
       
+      setError(null)
       setLoading(false)
     } catch (err) {
       console.error('Failed to fetch user profile:', err)
@@ -91,16 +104,14 @@ const Profile = () => {
       })
       
       // Update user state and AuthContext with new data
-      const updatedUser = response.data.user
-      setUser(updatedUser)
-      updateUser(updatedUser)
-      
-      // Hide alerts after successful update
-      setShowAlerts({ phone: false, bio: false })
-      
-      // Show success message briefly
-      setError(null)
-      
+      const updatedUser = response.data.user || response.data
+      if (updatedUser) {
+        setUser(updatedUser)
+        updateUser(updatedUser)
+        // Hide alerts after successful update
+        setShowAlerts({ phone: false, bio: false })
+        setError(null)
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update profile')
     } finally {
