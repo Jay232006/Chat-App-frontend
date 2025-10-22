@@ -17,7 +17,7 @@ const Signup = () => {
 
     try {
       // The user model expects 'username', so we'll map 'name' to it.
-      const response = await API.post('api/auth/register', {
+      const response = await API.post('api/auth/signup', {
         username: name,
         email,
         password,
