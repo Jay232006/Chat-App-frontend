@@ -17,7 +17,7 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await API.post('/auth/login', { email, password });
+      const response = await API.post('api/auth/login', { email, password });
       // Use AuthContext to store authentication data
       login(response.data.user, response.data.token);
       // Also store in localStorage as backup
