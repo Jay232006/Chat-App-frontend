@@ -36,54 +36,101 @@ const ChatWindow = ({ selectedChat }) => {
       setError('Authentication required. Please log in again.');
       return;
     }
-    
-    // Use path that avoids ad blockers (socket.io instead of socket.io)
-    socket.current = io(API_BASE, { 
-      withCredentials: true,
-      path: '/socket/socket.io',
-      auth: {
-        token: token
-      }
-    })
-    
-    // Set up socket event listeners
-    socket.current.on('connect', () => {
-      console.log('Socket connected successfully')
-    })
-    
-    socket.current.on('connect_error', (error) => {
-      console.error('Socket connection error:', error.message)
-      setError('Failed to connect to chat server: ' + error.message)
-    })
-    
-    socket.current.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason)
-    })
-    
-    if (userInfo && socket.current) {
-      socket.current.emit('setup', userInfo)
-    }
 
-    const onMessageReceived = (newMessage) => {
-      if (currentChatIdRef.current && newMessage.chat && currentChatIdRef.current === newMessage.chat._id) {
-        setMessages(prev => [...prev, {
-          id: newMessage._id,
-          text: newMessage.content,
-          sender: newMessage.sender._id === (userInfo?._id) ? 'me' : 'them',
-          time: new Date(newMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }])
-      }
-    }
+    let isMounted = true;
 
-    socket.current.on('message received', onMessageReceived)
+    const openSocketWithFallback = async () => {
+      const candidates = [
+        '/websocket-connection',
+        '/socket/socket.io',
+        '/socket.io'
+      ];
+
+      let lastError = null;
+
+      let onMessageReceivedHandler = null;
+
+      for (const path of candidates) {
+        try {
+          const s = io(API_BASE, {
+            withCredentials: true,
+            path,
+            transports: ['polling', 'websocket'], 
+            upgrade: true,
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            auth: { token }
+          });
+
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Connection timeout')), 7000);
+            s.once('connect', () => { clearTimeout(timer); resolve(); });
+            s.once('connect_error', (err) => { clearTimeout(timer); reject(err); });
+          });
+
+          if (!isMounted) {
+            s.disconnect();
+            return;
+          }
+
+          socket.current = s;
+          console.log(`Socket connected successfully via path: ${path}`);
+
+          // Set up socket event listeners for the active connection
+          socket.current.on('connect_error', (error) => {
+            console.error('Socket connection error:', error.message);
+            setError('Failed to connect to chat server: ' + error.message);
+          });
+
+          socket.current.on('disconnect', (reason) => {
+            console.log('Socket disconnected:', reason);
+          });
+
+          if (userInfo && socket.current) {
+            socket.current.emit('setup', userInfo);
+          }
+
+          // Attach message listener after successful connection
+          onMessageReceivedHandler = (newMessage) => {
+            if (currentChatIdRef.current && newMessage.chat && currentChatIdRef.current === newMessage.chat._id) {
+              setMessages(prev => [...prev, {
+                id: newMessage._id,
+                text: newMessage.content,
+                sender: newMessage.sender._id === (userInfo?._id) ? 'me' : 'them',
+                time: new Date(newMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }])
+            }
+          };
+          socket.current.on('message received', onMessageReceivedHandler);
+
+          // Connected successfully, stop trying others
+          return;
+        } catch (err) {
+          lastError = err;
+          console.warn(`Socket connect failed on path ${path}:`, err?.message || err);
+          // Try next candidate path
+        }
+      }
+
+      if (isMounted) {
+        console.error('All socket connection attempts failed:', lastError?.message || lastError);
+        setError('Failed to connect to chat server. Please try again later.');
+      }
+    };
+
+    openSocketWithFallback();
 
     return () => {
+      isMounted = false;
       if (socket.current) {
-        socket.current.off('message received', onMessageReceived)
-        socket.current.disconnect()
+        if (onMessageReceivedHandler) {
+          socket.current.off('message received', onMessageReceivedHandler)
+        }
+        socket.current.disconnect();
       }
     }
-  }, [API_BASE, userInfo])
+  }, [API_BASE, userInfo, token]);
 
   // Resolve or create chat for selected contact (POST)
   useEffect(() => {
