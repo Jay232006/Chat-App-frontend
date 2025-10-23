@@ -3,6 +3,7 @@ import MessageInput from './MessageInput'
 import { io } from 'socket.io-client'
 import { ThemeContext } from '../context/ThemeContext'
 import { AuthContext } from '../context/AuthContext'
+import { API_BASE_URL } from '../utils/api'
 
 const ChatWindow = ({ selectedChat }) => {
   const { darkMode } = useContext(ThemeContext)
@@ -12,7 +13,7 @@ const ChatWindow = ({ selectedChat }) => {
   const [error, setError] = useState(null)
 
   const socket = useRef(null)
-  const API_BASE = import.meta.env.VITE_API_URL
+  const API_BASE = API_BASE_URL
   const token = authToken
   const userInfo = authUser
 
@@ -39,7 +40,7 @@ const ChatWindow = ({ selectedChat }) => {
     // Use path that avoids ad blockers (socket.io instead of socket.io)
     socket.current = io(API_BASE, { 
       withCredentials: true,
-      path: '/socket/socket.io', // Custom path to avoid ad blockers
+      path: '/socket/socket.io',
       auth: {
         token: token
       }

@@ -15,10 +15,11 @@ const ChatList = ({ selectedChat, onSelectChat }) => {
     async function loadUsers() {
       try {
         setLoading(true);
-        const base = import.meta.env.VITE_API_URL;
-        const res = await fetch(`${base}/api/users`, { signal: ctrl.signal });
-        if (!res.ok) throw new Error('Failed to load users');
-        const users = await res.json();
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        // +        const base = 'https://chat-app-backend-31vq.onrender.com';
+                 const res = await fetch(`${base}/api/users`, { signal: ctrl.signal });
+                 if (!res.ok) throw new Error('Failed to load users');
+                 const users = await res.json();
         // Remove the currently logged-in user from the chat list
         const visibleUsers = authUser ? users.filter(u => u._id !== authUser._id) : users;
         // map server users to UI shape
