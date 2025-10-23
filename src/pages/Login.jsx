@@ -43,7 +43,7 @@ const Login = () => {
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to continue to your chats</p>
+          <p className="text-gray-600">Login in to continue to your chats</p>
         </div>
 
         {error && (
@@ -89,7 +89,7 @@ const Login = () => {
               <input type="checkbox" className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500" />
               <span className="ml-2 text-gray-600">Remember me</span>
             </label>
-            <a href="#" className="text-blue-500 hover:text-blue-600">Forgot password?</a>
+            {/* <a href="#" className="text-blue-500 hover:text-blue-600">Forgot password?</a> */}
           </div>
 
           <button
@@ -97,7 +97,7 @@ const Login = () => {
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Signing In...' : 'Sign In'}
+            {loading ? 'Loging In...' : 'LogIn'}
           </button>
         </form>
 
