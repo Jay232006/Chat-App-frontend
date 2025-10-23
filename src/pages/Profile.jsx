@@ -32,7 +32,7 @@ const Profile = () => {
       }
 
       console.log("Fetching profile with token:", token)
-      const response = await API.get('/users/me', {
+      const response = await API.get('/api/users/me', {
         headers: { Authorization: `Bearer ${token}` }
       })
       
@@ -99,7 +99,7 @@ const Profile = () => {
       }
 
       setLoading(true)
-      const response = await API.put('/users/profile', formData, {
+      const response = await API.put('/api/users/profile', formData, {
         headers: { Authorization: `Bearer ${token}` }
       })
       
