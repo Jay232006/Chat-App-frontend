@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import API from "../utils/api";
+import { AuthContext } from '../context/AuthContext';
 
 const Signup = () => {
   const [name, setName] = useState('');
@@ -9,6 +10,7 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,17 +18,22 @@ const Signup = () => {
     setError('');
 
     try {
-      // The user model expects 'username', so we'll map 'name' to it.
-      const response = await API.post('api/auth/register', {
+      // Create account
+      await API.post('/api/auth/register', {
         username: name,
         email,
         password,
       });
-      console.log('Signup successful:', response.data);
-      navigate('/login'); // Redirect to login page after successful signup
+
+      // Auto-login with the same credentials
+      const loginRes = await API.post('/api/auth/login', { email, password });
+
+      // Persist auth and go to chat
+      login(loginRes.data.user, loginRes.data.token);
+      navigate('/chat');
     } catch (err) {
+      console.error('Signup error:', err.response?.data || err);
       setError(err.response?.data?.message || 'An error occurred during signup.');
-      console.error('Signup error:', err.response?.data);
     } finally {
       setLoading(false);
     }
