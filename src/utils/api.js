@@ -2,7 +2,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://chat-app-backend-31vq.onrender.com",
+  baseURL: "http://localhost:3000",
 });
 
 export default API;
