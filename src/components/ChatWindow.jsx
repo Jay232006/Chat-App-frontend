@@ -36,42 +36,28 @@ const ChatWindow = ({ selectedChat }) => {
       return;
     }
     
-    try {
-      // Use path that avoids ad blockers (socket.io instead of socket.io)
-      socket.current = io(API_BASE, { 
-        withCredentials: true,
-        path: '/socket.io', // Standard socket.io path
-        auth: {
-          token: token
-        },
-        reconnectionAttempts: 3, // Limit reconnection attempts
-        timeout: 5000 // Shorter timeout to fail faster
-      })
-      
-      // Set up socket event listeners
-      socket.current.on('connect', () => {
-        console.log('Socket connected successfully')
-        setError(null) // Clear any previous errors
-      })
-      
-      socket.current.on('connect_error', (error) => {
-        console.error('Socket connection error:', error.message)
-        // Don't show error to user, just log it
-        console.log('Chat will work in offline mode')
-        
-        // Disconnect socket to prevent further reconnection attempts
-        if (socket.current) {
-          socket.current.disconnect()
-        }
-      })
-      
-      socket.current.on('disconnect', (reason) => {
-        console.log('Socket disconnected:', reason)
-      })
-    } catch (err) {
-      console.error('Error initializing socket:', err)
-      // Continue without socket functionality
-    }
+    // Use path that avoids ad blockers (socket.io instead of socket.io)
+    socket.current = io(API_BASE, { 
+      withCredentials: true,
+      path: '/socket/socket.io', // Custom path to avoid ad blockers
+      auth: {
+        token: token
+      }
+    })
+    
+    // Set up socket event listeners
+    socket.current.on('connect', () => {
+      console.log('Socket connected successfully')
+    })
+    
+    socket.current.on('connect_error', (error) => {
+      console.error('Socket connection error:', error.message)
+      setError('Failed to connect to chat server: ' + error.message)
+    })
+    
+    socket.current.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason)
+    })
     
     if (userInfo && socket.current) {
       socket.current.emit('setup', userInfo)
@@ -88,13 +74,7 @@ const ChatWindow = ({ selectedChat }) => {
       }
     }
 
-    // Only set up message listener if socket is connected
-    if (socket.current && socket.current.connected) {
-      socket.current.on('message received', onMessageReceived)
-    } else {
-      // Fallback for when socket is not connected
-      console.log('Using fallback mode for messages (polling not implemented)')
-    }
+    socket.current.on('message received', onMessageReceived)
 
     return () => {
       if (socket.current) {
