@@ -38,7 +38,7 @@ const ChatWindow = ({ selectedChat }) => {
     }
 
     let isMounted = true;
-
+    let onMessageReceivedHandler;
     const openSocketWithFallback = async () => {
       const candidates = [
         '/websocket-connection',
@@ -48,7 +48,7 @@ const ChatWindow = ({ selectedChat }) => {
 
       let lastError = null;
 
-      let onMessageReceivedHandler = null;
+      onMessageReceivedHandler = null;
 
       for (const path of candidates) {
         try {
@@ -120,7 +120,7 @@ const ChatWindow = ({ selectedChat }) => {
     };
 
     openSocketWithFallback();
-
+    
     return () => {
       isMounted = false;
       if (socket.current) {
