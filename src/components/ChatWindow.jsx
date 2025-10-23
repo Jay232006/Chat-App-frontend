@@ -40,27 +40,39 @@ const ChatWindow = ({ selectedChat }) => {
     let isMounted = true;
     let onMessageReceivedHandler;
     const openSocketWithFallback = async () => {
-      const candidates = [
-        '/websocket-connection',
-        '/socket/socket.io',
-        '/socket.io'
-      ];
+      // Enhanced path fallbacks for better compatibility
+      const paths = ['/realtime', '/ws', '/websocket-connection', '/socket.io'];
+      const transports = ['polling', 'websocket']; // Prioritize polling for ad-blocker compatibility
+      
+      // Determine base URL with HTTPS preference for production
+       const baseURL = API_BASE_URL;
+       const isProduction = !baseURL.includes('localhost') && !baseURL.includes('127.0.0.1');
+       const socketURL = isProduction && baseURL.startsWith('http:') 
+         ? baseURL.replace('http:', 'https:') 
+         : baseURL;
 
       let lastError = null;
 
       onMessageReceivedHandler = null;
 
-      for (const path of candidates) {
+      for (const path of paths) {
         try {
-          const s = io(API_BASE, {
+          console.log(`Attempting Socket.IO connection with path: ${path} on ${socketURL}`);
+          
+          const s = io(socketURL, {
+            path: path,
+            transports: transports,
             withCredentials: true,
-            path,
-            transports: ['polling', 'websocket'], 
+            auth: {
+              token: token
+            },
+            timeout: 15000, // Increased timeout for better reliability
+            forceNew: true,
             upgrade: true,
+            rememberUpgrade: false, // Don't remember transport upgrades
             reconnection: true,
             reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-            auth: { token }
+            reconnectionDelay: 1000
           });
 
           await new Promise((resolve, reject) => {
