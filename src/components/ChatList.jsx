@@ -1,6 +1,7 @@
 import { useEffect, useState, useContext } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
+import { API_BASE_URL } from '../utils/api';
 
 const ChatList = ({ selectedChat, onSelectChat }) => {
   const { darkMode } = useTheme();
@@ -15,8 +16,7 @@ const ChatList = ({ selectedChat, onSelectChat }) => {
     async function loadUsers() {
       try {
         setLoading(true);
-        const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        // +        const base = 'https://chat-app-backend-31vq.onrender.com';
+        const base = API_BASE_URL;
                  const res = await fetch(`${base}/api/users`, { signal: ctrl.signal });
                  if (!res.ok) throw new Error('Failed to load users');
                  const users = await res.json();
