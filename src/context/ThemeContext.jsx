@@ -12,7 +12,6 @@ export const ThemeProvider = ({ children }) => {
     // Default to light mode
     return false;
   });
-
   // Update the theme when darkMode state changes
   useEffect(() => {
     if (darkMode) {
