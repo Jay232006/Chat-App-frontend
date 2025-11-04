@@ -9,7 +9,6 @@ const getBaseURL = () => {
   if (isDevelopment) {
     return "https://chat-app-backend-31vq.onrender.com";
   }
-  
   // For production, ensure HTTPS
   const baseURL = "https://chat-app-backend-31vq.onrender.com";
   return baseURL.startsWith('http:') ? baseURL.replace('http:', 'https:') : baseURL;
