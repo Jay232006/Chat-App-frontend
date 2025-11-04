@@ -13,7 +13,6 @@ body {
 * {
   box-sizing: border-box;
 }
-
 /* Dark mode styles */
 html.dark body {
   background-color: #121212;
