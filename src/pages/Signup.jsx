@@ -25,10 +25,8 @@ const Signup = () => {
         password,
       });
 
-      // Auto-login with the same credentials
       const loginRes = await API.post('/api/auth/login', { email, password });
 
-      // Persist auth and go to chat
       login(loginRes.data.user, loginRes.data.token);
       navigate('/chat');
     } catch (err) {
