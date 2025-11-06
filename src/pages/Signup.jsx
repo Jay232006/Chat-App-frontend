@@ -18,7 +18,6 @@ const Signup = () => {
     setError('');
 
     try {
-      // Create account
       await API.post('/api/auth/register', {
         username: name,
         email,
