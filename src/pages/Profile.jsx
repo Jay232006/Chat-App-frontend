@@ -38,7 +38,6 @@ const Profile = () => {
       
       console.log("Profile response:", response.data)
       
-      // Check if response.data.user exists, otherwise use response.data directly
       const userData = response.data.user || response.data
       
       if (!userData) {
@@ -57,7 +56,6 @@ const Profile = () => {
         bio: userData.bio || ''
       })
 
-      // Show mini alerts for empty fields after a short delay
       setTimeout(() => {
         setShowAlerts({
           phone: !userData.phone,
