@@ -10,7 +10,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load user and token from localStorage on initial render
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('userInfo');
     
@@ -20,7 +19,6 @@ export const AuthProvider = ({ children }) => {
         setUser(JSON.parse(storedUser));
       } catch (error) {
         console.error('Failed to parse user info:', error);
-        // Clear invalid data
         localStorage.removeItem('userInfo');
       }
     }
