@@ -113,7 +113,6 @@ const ChatWindow = ({ selectedChat }) => {
         } catch (err) {
           lastError = err;
           console.warn(`Socket connect failed on path ${path}:`, err?.message || err);
-          // Try next candidate path
         }
       }
 
@@ -136,11 +135,9 @@ const ChatWindow = ({ selectedChat }) => {
     }
   }, [API_BASE, userInfo, token]);
 
-  // Resolve or create chat for selected contact (POST)
   useEffect(() => {
     if (!selectedChat?.id) return
     setError(null)
-    // Clear messages when switching contacts
     setMessages([])
     setCurrentChat(null)
     setCurrentChatId(null)
@@ -149,9 +146,7 @@ const ChatWindow = ({ selectedChat }) => {
 
     async function resolveChat() {
       try {
-        // First try to get existing chat
         let chat;
-        // Find chat for the selected contact
         const getRes = await fetch(`${API_BASE}/api/chats`, {
           headers: {
             'Content-Type': 'application/json',
