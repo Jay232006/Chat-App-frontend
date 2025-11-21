@@ -101,7 +101,6 @@ const Profile = () => {
         headers: { Authorization: `Bearer ${token}` }
       })
       
-      // Update user state and AuthContext with new data
       const updatedUser = response.data.user || response.data
       if (updatedUser) {
         setUser(updatedUser)
