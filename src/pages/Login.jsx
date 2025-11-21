@@ -27,7 +27,6 @@ const Login = () => {
       navigate('/chat');
     } catch (err) {
       console.error('Login error:', err);
-      // If there's no server response, it's likely a network/CORS/cold-start issue
       if (!err.response) {
         setError('Backend is waking up or unreachable. Please wait a few seconds and try again.');
       } else {
