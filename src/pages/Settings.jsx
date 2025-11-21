@@ -10,7 +10,6 @@ const Settings = () => {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
 
-  // Save notification settings to localStorage
   useEffect(() => {
     const savedSettings = localStorage.getItem('chatAppSettings');
     if (savedSettings) {
@@ -35,7 +34,6 @@ const Settings = () => {
       setLoading(true);
       setMessage({ type: 'info', text: 'Preparing your data...' });
       
-      // Get user info from localStorage
       const userInfo = JSON.parse(localStorage.getItem('userInfo'));
       if (!userInfo) {
         setMessage({ type: 'error', text: 'You must be logged in to download your data' });
