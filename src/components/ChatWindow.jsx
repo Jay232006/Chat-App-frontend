@@ -212,7 +212,6 @@ const ChatWindow = ({ selectedChat }) => {
     return () => ctrl.abort()
   }, [selectedChat, API_BASE, token])
 
-  // Fetch messages when chatId changes (GET /api/messages/:chatId)
   useEffect(() => {
     if (!currentChatId) return
     setLoading(true)
@@ -221,7 +220,6 @@ const ChatWindow = ({ selectedChat }) => {
 
     if (socket.current) socket.current.emit('join chat', currentChatId)
     
-    // Clear previous messages when changing chats
     setMessages([])
     
     fetch(`${API_BASE}/api/messages/${currentChatId}`, {
@@ -243,7 +241,6 @@ const ChatWindow = ({ selectedChat }) => {
           time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }))
         setMessages(formattedMessages)
-        // Cache messages for this chat
         localStorage.setItem(`messages_${currentChatId}`, JSON.stringify(formattedMessages))
         setLoading(false)
       })
@@ -261,7 +258,6 @@ const ChatWindow = ({ selectedChat }) => {
   const handleSendMessage = async (text) => {
     if (!text.trim()) return
 
-    // Guard: ensure we have token
     if (!token) {
       setError('Authentication required. Please log in again.')
       return
@@ -269,7 +265,6 @@ const ChatWindow = ({ selectedChat }) => {
 
     let chatId = currentChatId
     if (!chatId && selectedChat?.id) {
-      // resolve chat first (same as above)
       try {
         const res = await fetch(`${API_BASE}/api/chats`, {
           method: 'POST',
@@ -285,7 +280,6 @@ const ChatWindow = ({ selectedChat }) => {
         setCurrentChatId(chat._id)
         chatId = chat._id
         
-        // Join the chat room via socket
         if (socket.current && chat._id) {
           socket.current.emit("join chat", chat._id);
         }
@@ -296,7 +290,6 @@ const ChatWindow = ({ selectedChat }) => {
       }
     }
 
-    // Guard: ensure chatId was resolved
     if (!chatId) {
       setError('No chat available to send message.')
       return
@@ -308,7 +301,6 @@ const ChatWindow = ({ selectedChat }) => {
     setMessages(prev => [...prev, newMessage])
 
     try {
-      // Send message to the server to store in database
       const res = await fetch(`${API_BASE}/api/messages`, {
         method: 'POST',
         headers: {
@@ -319,7 +311,6 @@ const ChatWindow = ({ selectedChat }) => {
       })
       
       if (!res.ok) {
-        // Try to extract error body and status for better feedback
         const status = res.status
         const errorText = await res.text().catch(() => '')
         let errorData = {}
@@ -331,7 +322,6 @@ const ChatWindow = ({ selectedChat }) => {
       const data = await res.json();
       console.log("Message successfully saved to database:", data);
       
-      // Update the message in the UI with the server-generated ID and timestamp
       setMessages(prev => prev.map(msg => msg.id === tempId ? {
         id: data._id || data.id,
         text: data.content,
