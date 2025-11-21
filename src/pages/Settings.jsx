@@ -41,7 +41,6 @@ const Settings = () => {
         return;
       }
       
-      // Create a simple data object with user information
       const userData = {
         user: userInfo,
         settings: {
@@ -52,12 +51,10 @@ const Settings = () => {
         exportDate: new Date().toISOString()
       };
       
-      // Create a downloadable file
       const dataStr = JSON.stringify(userData, null, 2);
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
       
-      // Create download link and trigger download
       const a = document.createElement('a');
       a.href = url;
       a.download = `chat-app-data-${new Date().toISOString().split('T')[0]}.json`;
