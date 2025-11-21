@@ -19,7 +19,6 @@ export const ThemeProvider = ({ children }) => {
     localStorage.setItem('darkMode', darkMode);
   }, [darkMode]);
 
-  // Toggle dark mode
   const toggleDarkMode = () => {
     setDarkMode(prevMode => !prevMode);
   };
@@ -31,7 +30,6 @@ export const ThemeProvider = ({ children }) => {
   );
 };
 
-// Custom hook to use the theme context
 export const useTheme = () => {
   const context = useContext(ThemeContext);
   if (context === undefined) {
