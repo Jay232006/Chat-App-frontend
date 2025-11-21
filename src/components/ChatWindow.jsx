@@ -17,9 +17,7 @@ const ChatWindow = ({ selectedChat }) => {
   const token = authToken
   const userInfo = authUser
 
-  // New / missing state and refs
   const [currentChatId, setCurrentChatId] = useState(() => {
-    // Try to load saved chat ID from localStorage on initial render
     return localStorage.getItem('currentChatId') || null
   })
   const [currentChat, setCurrentChat] = useState(null)
@@ -29,7 +27,6 @@ const ChatWindow = ({ selectedChat }) => {
     currentChatIdRef.current = currentChatId
   }, [currentChatId])
 
-  // Socket init
   useEffect(() => {
     if (!token) {
       console.error('No authentication token available for socket connection');
@@ -40,11 +37,9 @@ const ChatWindow = ({ selectedChat }) => {
     let isMounted = true;
     let onMessageReceivedHandler;
     const openSocketWithFallback = async () => {
-      // Enhanced path fallbacks for better compatibility
       const paths = ['/realtime', '/ws', '/websocket-connection', '/socket.io'];
-      const transports = ['polling', 'websocket']; // Prioritize polling for ad-blocker compatibility
+      const transports = ['polling', 'websocket']; 
       
-      // Determine base URL with HTTPS preference for production
        const baseURL = API_BASE_URL;
        const isProduction = !baseURL.includes('localhost') && !baseURL.includes('127.0.0.1');
        const socketURL = isProduction && baseURL.startsWith('http:') 
