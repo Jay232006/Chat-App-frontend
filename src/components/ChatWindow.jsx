@@ -329,7 +329,6 @@ const ChatWindow = ({ selectedChat }) => {
         time: new Date(data.createdAt || currentTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       } : msg));
       
-      // Update localStorage with the latest messages
       const updatedMessages = (messages || []).map(msg => 
         msg.id === tempId ? {
           id: data._id || data.id,
@@ -340,12 +339,10 @@ const ChatWindow = ({ selectedChat }) => {
       );
       localStorage.setItem(`messages_${chatId}`, JSON.stringify(updatedMessages));
       
-      // Emit the new message to other users via socket
       if (socket.current) socket.current.emit('new message', data);
     } catch (err) {
       console.error('Error sending message:', err);
       setMessages(prev => prev.map(msg => msg.id === tempId ? { ...msg, failed: true } : msg));
-      // Show error to user
       setError(`Failed to send message: ${err.message}`);
     }
   }
@@ -408,7 +405,6 @@ const ChatWindow = ({ selectedChat }) => {
 
 export default ChatWindow
 
-// Message bubble component
 const MessageBubble = ({ message }) => {
   const isMe = message.sender === 'me'
   
