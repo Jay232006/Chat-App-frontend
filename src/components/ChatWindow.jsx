@@ -61,10 +61,10 @@ const ChatWindow = ({ selectedChat }) => {
             auth: {
               token: token
             },
-            timeout: 15000, // Increased timeout for better reliability
+            timeout: 15000, 
             forceNew: true,
             upgrade: true,
-            rememberUpgrade: false, // Don't remember transport upgrades
+            rememberUpgrade: false, 
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 1000
@@ -84,7 +84,6 @@ const ChatWindow = ({ selectedChat }) => {
           socket.current = s;
           console.log(`Socket connected successfully via path: ${path}`);
 
-          // Set up socket event listeners for the active connection
           socket.current.on('connect_error', (error) => {
             console.error('Socket connection error:', error.message);
             setError('Failed to connect to chat server: ' + error.message);
@@ -98,7 +97,6 @@ const ChatWindow = ({ selectedChat }) => {
             socket.current.emit('setup', userInfo);
           }
 
-          // Attach message listener after successful connection
           onMessageReceivedHandler = (newMessage) => {
             if (currentChatIdRef.current && newMessage.chat && currentChatIdRef.current === newMessage.chat._id) {
               setMessages(prev => [...prev, {
@@ -111,7 +109,6 @@ const ChatWindow = ({ selectedChat }) => {
           };
           socket.current.on('message received', onMessageReceivedHandler);
 
-          // Connected successfully, stop trying others
           return;
         } catch (err) {
           lastError = err;
