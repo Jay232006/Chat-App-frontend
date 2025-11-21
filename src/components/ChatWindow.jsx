@@ -157,7 +157,6 @@ const ChatWindow = ({ selectedChat }) => {
         
         if (getRes.ok) {
           const allChats = await getRes.json();
-          // Find the chat with the selected contact
           chat = allChats.find(c => 
             c.users.some(u => u._id === selectedChat.id)
           );
@@ -165,7 +164,6 @@ const ChatWindow = ({ selectedChat }) => {
           console.error(`Failed to get chats: ${getRes.status}`);
         }
         
-        // If no existing chat found, create a new one
         if (!chat) {
           console.log("Creating new chat with user:", selectedChat.id);
           
@@ -194,10 +192,8 @@ const ChatWindow = ({ selectedChat }) => {
         setCurrentChat(chat);
         setCurrentChatId(chat._id);
         
-        // Store chat ID in localStorage for persistence across refreshes
         localStorage.setItem('currentChatId', chat._id);
         
-        // Join the chat room via socket
         if (socket.current && chat._id) {
           socket.current.emit("join chat", chat._id);
         }
